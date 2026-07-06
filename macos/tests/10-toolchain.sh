@@ -12,15 +12,22 @@ check    "MoltenVK installed"   test -f "$BREW/lib/libMoltenVK.dylib"
 check    "SDL3 installed (sdl2-compat target)" test -f "$BREW/opt/sdl3/lib/libSDL3.0.dylib"
 check    "ffmpeg headers installed (plugin)"   test -f "$BREW/opt/ffmpeg/include/libavformat/avformat.h"
 
-# Vulkan stack reachable at all (headless-friendly proxy for GPU access).
-# Assert on `deviceName` (VkPhysicalDeviceProperties, core Vulkan 1.0) — it is the
-# enumerated GPU's name and is present on every MoltenVK version. Do NOT key on
-# `driverName`: that field comes from VK_KHR_driver_properties (Vulkan 1.2) and is
-# absent on older MoltenVK (e.g. the macos-14 GitHub runner), which would fail the
-# check even though Vulkan is working and a GPU was enumerated.
+# Vulkan GPU enumeration through MoltenVK — REAL-GPU-GATED (Tier 2).
+# Enumerating a physical device requires a usable Metal GPU, which headless CI
+# runners may not provide: the macos-14 GitHub runner enumerates nothing, while
+# macos-15 does. So this PASSES when a GPU shows up and SKIPS when none does — it
+# must never hard-fail CI on the mere absence of a GPU. (The deterministic,
+# always-on toolchain anchor is the "MoltenVK installed" check above.)
+# Assert on `deviceName` — VkPhysicalDeviceProperties, core Vulkan 1.0, present
+# whenever a device enumerates — not `driverName`, which needs
+# VK_KHR_driver_properties (Vulkan 1.2) and is absent on older MoltenVK.
 if command -v vulkaninfo >/dev/null 2>&1; then
   vi="$(VK_ICD_FILENAMES="$BREW/etc/vulkan/icd.d/MoltenVK_icd.json" vulkaninfo 2>/dev/null)"
-  contains "Vulkan enumerates a GPU via MoltenVK" "deviceName" "$vi"
+  case "$vi" in
+    *deviceName*) pass "Vulkan enumerates a GPU via MoltenVK" ;;
+    *)            skip "Vulkan enumerates a GPU via MoltenVK" \
+                       "no GPU enumerated (headless runner / no usable Metal device)" ;;
+  esac
 else
   skip "Vulkan GPU enumeration" "vulkaninfo (vulkan-tools) not installed"
 fi

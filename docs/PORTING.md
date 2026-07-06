@@ -106,6 +106,20 @@ the toolchain test runs it. If SDL3/sdl2-compat changes how
 `SDL_VULKAN_LIBRARY` is honoured, the Vulkan renderer test (`30-renderers.sh`)
 catches it: look for `Vulkan Driver Name: MoltenVK` in the engine log.
 
+**GPU enumeration is real-GPU-gated (Tier 2), not a hard CI check.** Actually
+enumerating a physical device through MoltenVK needs a usable Metal GPU, which a
+headless CI runner may not have — the GitHub `macos-14` runner enumerates nothing
+via `vulkaninfo`, while `macos-15` does. So the toolchain test
+(`10-toolchain.sh`) **passes** when a GPU enumerates and **skips** (never fails)
+when none does; the deterministic, always-on anchor is the separate "MoltenVK
+installed" file check. The assertion greps for `deviceName`
+(`VkPhysicalDeviceProperties`, core Vulkan 1.0) — *not* `driverName`, which comes
+from `VK_KHR_driver_properties` (Vulkan 1.2) and is absent on older MoltenVK, so
+keying on it produced a false failure on `macos-14`. On real Apple Silicon
+hardware (the actual target) the check runs and passes; it only degrades to a
+skip where there is genuinely no GPU. This mirrors the Tier-1/Tier-2 split the
+Windows-on-ARM port uses for the same reason.
+
 ---
 
 ## 4. Self-contained bundling
