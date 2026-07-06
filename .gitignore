@@ -44,3 +44,17 @@ engine/droid/project.properties
 
 # Flatpak build artifacts
 .flatpak-builder
+
+# ─────────────────────────────────────────────────────────────
+# Apple Silicon port additions (macos/ build & packaging)
+# ─────────────────────────────────────────────────────────────
+.DS_Store
+._*
+# Homebrew static-lib symlink dir created by build-engine.sh (arch-specific)
+engine/libs-*/
+# assembled app + scratch are build outputs, not source
+*.app/
+*.metazip
+/build/
+.idea/
+.vscode/

@@ -1,103 +1,108 @@
-# [FTEQW](https://fteqw.org)
+# FTEQW for Apple Silicon (native arm64)
 
-![FTEQW Logo](engine/client/fte_eukara.ico)
+A native **Apple Silicon (arm64)** build of the [FTEQW](https://www.fteqw.org/)
+engine, packaged as a self-contained macOS `.app`, that brings **full Quake and
+QuakeWorld** — single-player *and* multiplayer, with broad mod support — to
+M-series Macs without Rosetta.
 
-Powerful engine for playing and modding idTech based games.
+FTEQW is the "swiss-army knife" Quake engine: it runs both NetQuake and
+QuakeWorld game code in one binary, which is what makes it the right base for
+covering the whole lifespan of Quake mods (Team Fortress and its forks, Threewave
+/ Thunderwalker CTF, Zerstörer, RuneQuake, Rocket/Clan Arena, and so on) in a
+single native app.
 
-# What is FTEQW?
+> **Honest framing.** This is a *vibe-coded* port: a focused effort to get
+> upstream FTEQW building, rendering (OpenGL **and** Vulkan via MoltenVK), and
+> running its plugins natively on Apple Silicon — not a re-architecture of the
+> engine. The engine source is changed by exactly **one line**; everything else
+> is build tooling, packaging, and tests that live alongside the upstream tree.
+> Because "vibe-coded" means the seams are held together by workarounds against
+> moving upstream parts, the project leans hard on **automated tests** (see
+> below) as the mechanism for catching and fixing breakage when FTEQW, a
+> library, or macOS changes. If a test goes red, [`docs/PORTING.md`](docs/PORTING.md)
+> explains the assumption it guards and how to restore it.
 
-FTEQW is an advanced and portable Quake engine. It supports multiple games running on idTech, plus its own set of games that developers have created.
+## Target
 
-Due to the vast amount of supported formats, features, and innovations inside the engine and its very own QuakeC compiler (FTEQCC), it's very much considered the swiss-army knife of Quake engines.
+| | |
+|---|---|
+| **Architecture** | Apple Silicon / `arm64` only |
+| **OS** | macOS 11 (Big Sur) or later; developed on macOS 26 (Tahoe) |
+| **Renderers** | OpenGL and Vulkan (via MoltenVK), runtime-switchable |
+| **Build target** | FTEQW `FTE_TARGET=SDL2`, merged (`m-rel`) GL+Vulkan binary |
+| **Plugins** | `ffmpeg` (media) and `qi` (Quaddicted map database) |
 
-### Highlights:
+Intel Macs are out of scope. The stock upstream project already covers other
+platforms; this fork exists specifically for native Apple Silicon.
 
-- Single & multi-player support
-- Supports multiple games
-- Vast amount of map, model, & image formats are supported
-- Advanced console, with descriptions & autocompletion
-- Plugin support, enabling use of FFMPEG, Bullet/ODE physics & more
-- Extensive suite of QuakeC/entity debugging features
-- Deep integration with FTEQCC (fork of QuakeC created for FTEQW), which can even be executed in-game
-- Support for split-screen local multiplayer
-- Voice-chat via Opus & Speex
-- Support for hundreds of players on a single server
-- Works on Windows, Linux, OpenBSD... & more
-- New features are added all the time in cooperation with modders
+## Quick start
 
-# Contributions
+Requires [Homebrew](https://brew.sh/). From a clone of this repo:
 
-Contributions and help is always welcomed.
+```sh
+# build engine + self-contained app + plugins (add --install to auto-install deps)
+./macos/scripts/build-all.sh --install
+```
 
-### Guidelines:
+That produces `~/Applications/FTEQW.app`, fully self-contained (no Homebrew
+needed to *run* it). Then add your own Quake data — this repo ships **no**
+copyrighted game content:
 
-- Be kind and respectful
-- GPL2 licensed contributions are preferred, but plugins can be different but GPL-compatbile licenses
-- This codebase follows USA/EU/UK copyright laws
-- Always give credit from other codebases and make sure licenses are compatible
-- Test your changes and ensure nothing else has been broken (games, plugins, formats, etc)
+```
+~/Library/Application Support/FTEQW/
+├── id1/   pak0.pak, pak1.pak      # your Quake install (registered)
+├── qw/                            # QuakeWorld data
+└── <mod dirs>/                    # fortress, ctf, zer, arena, …
+```
 
-# Reporting Issues
+Launch it, or from a terminal:
 
-Bug reports are welcomed! :)
+```sh
+open ~/Applications/FTEQW.app --args -game fortress +map start   # example
+```
 
-### Required Information:
+The launcher defaults the renderer to Vulkan; override per-session with
+`+set vid_renderer gl`. See [`docs/BUILDING.md`](docs/BUILDING.md) for details
+and options.
 
-- Your system information such as your **Operating System** and **Hardware** (GPU/CPU)
-- If the binary is pre-built (e.g. from fteqw.org) or if it was built manually
-- What version of FTEQW you're using (type `version` in console)
-- If it is a supported game/mod/plugin/etc you're having issues with, then provide the version info for it, and tell us how it should be behaving
-- Make sure you have read the included documentation and ensure you have done everything right
-- Remember to double check the problem hasn't already been reported
-- Screenshots and/or video are generally desired if it is a visual malfunction
+## Tests
 
-**Windows Users**
+The test suite is the point of the project — it turns "did an upstream change
+break us?" into a single command:
 
-Please make sure you have not renamed your executable, `fteqw.exe`, to be `winquake.exe` or `glquake.exe` as Windows attempts compatability fixes that are not required for FTEQW and will cause problems.
+```sh
+./macos/tests/run.sh
+```
 
-# Documentation
+It covers the toolchain, the engine binary (both renderers compiled in), actual
+GL and Vulkan initialisation, plugin build/load/metadata, and full
+self-containment (static `otool` audit + runtime `lsof`). Tests that need a
+display and game data skip automatically in headless CI. See
+[`.github/workflows/`](.github/workflows/) for the CI wiring.
 
-Please see the `documentation` folder inside the repo for building, using the engine, tools, and more.
+## How it's built / what was changed
 
-The `specs` folder is for more advanced users seeking QuakeC and idTech file format related information or examples.
+Everything specific to this port is documented in
+**[`docs/PORTING.md`](docs/PORTING.md)** — each workaround, why it exists, and
+how to reconstruct or retire it as upstream evolves. The reproducible build
+lives in [`macos/scripts/`](macos/scripts/); the tests in
+[`macos/tests/`](macos/tests/).
 
-# Contact
+## Upstream & credits
 
-### Matrix
+- **Engine:** [FTEQW](https://www.fteqw.org/) — source at
+  <https://github.com/fte-team/fteqw>. Original project README preserved as
+  [`README.upstream.md`](README.upstream.md).
+- **Quake:** © id Software; game code released under the GPL. This repo contains
+  no id Software game data.
+- **Libraries** (via [Homebrew](https://brew.sh/)): SDL (sdl2-compat + SDL3),
+  MoltenVK, FreeType, libpng, jpeg-turbo, libogg/libvorbis, Opus, Speex,
+  FFmpeg. Bundling is done with
+  [dylibbundler](https://github.com/auriamg/macdylibbundler).
 
-https://matrix.to/#/#fte:matrix.org
+## License
 
-### IRC
-
-**Server:** irc.quakenet.org
-
-**Channel:** #fte
-
-### Forums
-
-**[Spike](https://forums.insideqc.com/memberlist.php?mode=viewprofile&u=26)** and **[eukara](https://forums.insideqc.com/memberlist.php?mode=viewprofile&u=949)** can be found on [insideqc.com](https://forums.insideqc.com/)
-
-### Discord
-
-https://discord.gg/p2ag7x6Ca6
-
-# Credits
-
-Please see the `Credits.md` file.
-
-# License
-
-Copyright (c) 2004-2025 FTE's team and its contributors
-Quake source (c) 1999 id Software
-
-FTEQW is supplied to you under the terms of the same license as the
-original Quake sources, the GNU General Public License Version 2.
-Please read the `LICENSE` file for details.
-
-# Download
-
-The latest source & binaries are always available at:
-
-[fteqw.org](https://fteqw.org)
-
-[fteqcc.org](https://fteqcc.org)
+GPL-2.0, inherited from FTEQW and the original Quake sources — see
+[`LICENSE`](LICENSE). All additions in this fork (scripts, tests, docs,
+packaging) are likewise GPL-2.0. See [`ATTRIBUTION.md`](ATTRIBUTION.md) for the
+change summary required by the license.

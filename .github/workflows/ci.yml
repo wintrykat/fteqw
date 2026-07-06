@@ -1,0 +1,54 @@
+name: build & test (Apple Silicon)
+
+on:
+  push:
+    branches: [ "**" ]
+  pull_request:
+  workflow_dispatch:
+  schedule:
+    # Weekly: catches upstream Homebrew / macOS drift even without a code change.
+    - cron: "0 7 * * 1"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-test:
+    strategy:
+      fail-fast: false
+      matrix:
+        # Both are arm64 (Apple Silicon) GitHub-hosted runners.
+        os: [macos-14, macos-15]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Confirm Apple Silicon
+        run: |
+          test "$(uname -m)" = arm64 || { echo "runner is not arm64"; exit 1; }
+          sw_vers
+
+      - name: Install dependencies (Homebrew)
+        run: |
+          brew install pkgconf autoconf automake libtool \
+            sdl2 libpng jpeg-turbo libvorbis libogg freetype opus speex speexdsp \
+            vulkan-headers vulkan-loader molten-vk vulkan-tools \
+            ffmpeg dylibbundler
+
+      - name: Build (engine + self-contained app + plugins)
+        run: ./macos/scripts/build-all.sh
+
+      - name: Test
+        # No game data on CI, so display/data-dependent tests self-skip; this
+        # validates the build, both renderers being compiled in, plugin
+        # build/bundle/metadata, and full static self-containment.
+        run: ./macos/tests/run.sh
+
+      - name: Upload app artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: FTEQW-${{ matrix.os }}.app
+          path: ~/Applications/FTEQW.app
+          if-no-files-found: warn
