@@ -1,0 +1,55 @@
+name: build & test (Linux arm64 AppImage)
+
+on:
+  push:
+    branches: [ "**" ]
+  pull_request:
+  workflow_dispatch:
+  schedule:
+    # Weekly: catches upstream / distro / AppImage-tooling drift without a code change.
+    - cron: "0 7 * * 1"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-test:
+    # Native arm64 (aarch64) GitHub-hosted runner — matches this fork's target.
+    runs-on: ubuntu-24.04-arm
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Confirm arm64
+        run: |
+          test "$(uname -m)" = aarch64 || { echo "runner is not aarch64"; exit 1; }
+          . /etc/os-release && echo "$PRETTY_NAME"
+
+      - name: Install dependencies (apt)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential clang pkg-config git patchelf file \
+            libsdl2-dev libpng-dev libjpeg-dev libvorbis-dev libogg-dev \
+            libfreetype-dev libopus-dev libspeex-dev libspeexdsp-dev zlib1g-dev \
+            libgl1-mesa-dev libvulkan-dev \
+            libavformat-dev libavcodec-dev libavutil-dev libswscale-dev libswresample-dev \
+            librsvg2-bin desktop-file-utils \
+            xvfb mesa-utils libgl1-mesa-dri mesa-vulkan-drivers vulkan-tools
+
+      - name: Build (engine + AppDir + plugins + AppImage)
+        run: ./linux/scripts/build-all.sh
+
+      - name: Test
+        # No game data on CI, so the display/data-dependent renderer tests self-skip.
+        # This validates the build, both renderers compiled in, the Vulkan loader via
+        # software lavapipe, plugin build/bundle/metadata, and full self-containment.
+        run: ./linux/tests/run.sh
+
+      - name: Upload AppImage artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: FTEQW-aarch64.AppImage
+          path: build/linux/FTEQW-*.AppImage
+          if-no-files-found: warn

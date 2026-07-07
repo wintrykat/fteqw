@@ -65,6 +65,22 @@ The launcher defaults the renderer to Vulkan; override per-session with
 `+set vid_renderer gl`. See [`docs/BUILDING.md`](docs/BUILDING.md) for details
 and options.
 
+## Linux (arm64 AppImage)
+
+A native **aarch64** build, packaged as a single self-contained `.AppImage`, is a
+first-class target too. From a clone on an arm64 Linux (or an arm64 Ubuntu VM):
+
+```sh
+./linux/scripts/build-all.sh --install     # engine + plugins + AppImage
+./build/linux/FTEQW-aarch64.AppImage        # run it
+```
+
+Same discipline as the macOS layer — merged GL+Vulkan engine, ffmpeg + qi
+plugins, and a self-containment audit — but the OpenGL/Vulkan stack comes from the
+host GPU driver (never bundled). Build/setup guide:
+[`docs/BUILDING-LINUX.md`](docs/BUILDING-LINUX.md); workaround reference:
+[`docs/PORTING-LINUX.md`](docs/PORTING-LINUX.md).
+
 ## Tests
 
 The test suite is the point of the project — it turns "did an upstream change

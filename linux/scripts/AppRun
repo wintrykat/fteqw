@@ -1,0 +1,33 @@
+#!/bin/sh
+# FTEQW AppImage entrypoint (installed as <AppDir>/AppRun). The AppImage runtime
+# sets $APPDIR and runs this. Everything is resolved at runtime, so this file is
+# machine-independent. Linux counterpart of macos/scripts/launcher.sh.
+#
+#  - Bundled libraries resolve via the engine's rpath ($ORIGIN/../lib) — we do
+#    NOT export LD_LIBRARY_PATH, which would let a bundled libstdc++/libz shadow
+#    the ones the host's GL/Vulkan driver was built against and break rendering.
+#  - Game data: FTE uses $XDG_DATA_HOME/fteqw by default. Set FTEQW_DATA to point
+#    -basedir elsewhere; set FTEHOME (honoured by the engine) to relocate saves.
+#  - Renderer: left to the engine's default (OpenGL). Choose per-run with
+#    +set vid_renderer vk (needs a Vulkan ICD from your GPU driver), -gl or -sw.
+#  - Auto-loads the bundled ffmpeg (media) and qi (Quaddicted) plugins.
+# Explicit arguments always win over these defaults.
+HERE="$(dirname "$(readlink -f "$0")")"
+APPDIR="${APPDIR:-$HERE}"
+BIN="$APPDIR/usr/bin/fteqw-engine"
+
+# Auto-load plugins unless the user is already driving plug_load themselves.
+case " $* " in
+  *" +plug_load "*|*" -noplugins "*) ;;
+  *) set -- +plug_load ffmpeg +plug_load qi "$@" ;;
+esac
+
+# Honour an explicit data dir; otherwise let the engine pick its XDG home.
+if [ -n "${FTEQW_DATA:-}" ]; then
+  case " $* " in
+    *" -basedir "*) ;;
+    *) set -- -basedir "$FTEQW_DATA" "$@" ;;
+  esac
+fi
+
+exec "$BIN" "$@"
