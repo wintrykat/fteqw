@@ -24,7 +24,7 @@ jobs:
       run:
         shell: msys2 {0}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0   # full history + tags so `git describe` stamps a real version
 
@@ -66,7 +66,7 @@ jobs:
 
       - name: Upload package ZIP
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: FTEQW-win-arm64
           path: windows/dist/FTEQW-*-win-arm64.zip
@@ -82,7 +82,7 @@ jobs:
       run:
         shell: msys2 {0}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Test (Tier 2 enabled)
         env:
           FTEQW_REAL_GPU: "1"
