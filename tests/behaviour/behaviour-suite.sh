@@ -54,16 +54,28 @@ emit_pass "fixture_present"
 
 BASEDIR="$(cd "$FIXTURE/.." && pwd)"   # parent of the ftetest gamedir
 
+# On Windows/MSYS2 the native engine .exe needs Windows-style paths for filesystem
+# args; cygpath converts them. On macOS/Linux cygpath is absent, so paths pass
+# through unchanged.
+to_native(){ if command -v cygpath >/dev/null 2>&1; then cygpath -m "$1"; else printf '%s' "$1"; fi; }
+BASEDIR_ARG="$(to_native "$BASEDIR")"
+
 # run_headless <secs> <logfile> <extra engine args...>
 # Runs the dedicated server with the fixture; kills it after <secs> if it hangs.
 # Sets HUNG=1 if it had to be killed, RC to the exit code otherwise.
+#
+# Console output is captured via -condebug into qconsole.log under FTEHOME and
+# folded into <logfile>. We read qconsole.log rather than stdout because the
+# Windows engine is a GUI-subsystem .exe that AllocConsole()s in dedicated mode
+# and writes little to a redirected stdout; qconsole.log works identically on
+# every platform (FTEHOME is honoured cross-platform, engine/common/fs.c).
 run_headless(){
 	secs="$1"; log="$2"; shift 2
 	home="$(mktemp -d 2>/dev/null || echo /tmp/ftebeh.$$)"
 	mkdir -p "$home"
 	HUNG=0; RC=0
-	FTEHOME="$home" "$ENGINE" -dedicated -basedir "$BASEDIR" +game ftetest "$@" \
-		>"$log" 2>&1 &
+	FTEHOME="$(to_native "$home")" "$ENGINE" -dedicated -condebug \
+		-basedir "$BASEDIR_ARG" +game ftetest "$@" >"$log" 2>&1 &
 	p=$!
 	i=0
 	while kill -0 "$p" 2>/dev/null; do
@@ -71,6 +83,7 @@ run_headless(){
 		sleep 1
 	done
 	wait "$p" 2>/dev/null; RC=$?
+	[ -f "$home/qconsole.log" ] && cat "$home/qconsole.log" >> "$log" 2>/dev/null
 	rm -rf "$home"
 }
 

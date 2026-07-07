@@ -112,8 +112,15 @@ fixture and asserts real behaviour — **no id data**, so unlike the old
   command diagnosed not crashed). Malformed fixtures (`maps/{badver,trunc}.bsp`,
   `bad/{badprogs,junkprogs}.dat`) derive from the good artifacts via
   `tools/gen_bad.py`; `maps/ftetest2.bsp` is a filename-distinct copy. Emits
-  `BEHAVIOUR-{PASS,FAIL,SKIP}` lines the wrappers fold into pass/fail counts.
-- `macos/tests/60-behaviour.sh`, `linux/tests/60-behaviour.sh` — thin wrappers.
+  `BEHAVIOUR-{PASS,FAIL,SKIP}` lines the wrappers fold into pass/fail counts. It
+  reads console output via `-condebug`'s `qconsole.log` (a Windows GUI `.exe`
+  writes little to a redirected stdout) and cygpath-converts paths on Windows —
+  no-op on macOS/Linux — so the one runner works on all three targets.
+- `macos/tests/60-behaviour.sh`, `linux/tests/60-behaviour.sh`,
+  `windows/tests/60-behaviour.sh` — thin wrappers; all three test sets now mirror
+  each other `10`→`60`. The Windows wrapper uses the packaged `fteqw.exe` (dev
+  fallback `engine/release/fteqw64.exe`) and the committed fixtures (no
+  python/fteqcc needed); Windows CI already runs `windows/tests/run.sh`.
 - `docs/PORTING-TESTING.md` — the design/"why + how to reconstruct" writeup.
 
 This tier already **found & fixed a real engine crash**: dedicated
@@ -129,7 +136,6 @@ all three, **document it as a future goal and desist**. Client-driven / UX /
 input / renderer tests are acceptably deferred **indefinitely**.
 
 **Next steps — headless, platform-identical only (not started):**
-- `windows/tests/60-behaviour.sh` stub (mirror macOS/Linux) once `windows/` exists.
 - LibreQuake historical-mod / total-conversion **load** matrix (server-side load
   only; GPL+CC0, fetched on demand, **never committed**).
 

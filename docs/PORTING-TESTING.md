@@ -93,8 +93,29 @@ are derived from the fresh good artifacts by `tools/gen_bad.py` (run from
 `compile.sh`), so they never go stale.
 
 It prints machine-readable `BEHAVIOUR-{PASS,FAIL,SKIP}` lines and exits non-zero
-on any failure. The per-platform `60-behaviour.sh` wrappers translate those lines
-into each harness's `pass`/`fail` counters (auto-discovered by `run.sh`).
+on any failure. The per-platform `60-behaviour.sh` wrappers (macOS, Linux **and
+Windows** — auto-discovered by each `run.sh`) translate those lines into each
+harness's `pass`/`fail` counters, so all three test sets now mirror each other
+`10`→`60`.
+
+**One runner, three targets.** The suite reads console output from `-condebug`'s
+`qconsole.log` (not stdout) because the Windows engine is a GUI-subsystem `.exe`
+that `AllocConsole()`s in dedicated mode and writes little to a redirected
+stdout; `FTEHOME` is honoured cross-platform (`engine/common/fs.c`), so the log
+lands in the temp home dir on every OS. Filesystem args (`-basedir`, `FTEHOME`)
+are `cygpath`-converted to Windows form when `cygpath` is present — a no-op on
+macOS/Linux. The Windows wrapper drives the packaged `fteqw.exe` (dev fallback
+`engine/release/fteqw64.exe`) against the committed fixtures (so no python/fteqcc
+on the Windows host), and Windows CI already runs `windows/tests/run.sh`.
+
+**Verification status (honest):** the shared runner is green on macOS (and, by the
+identical POSIX path, expected on Linux). The Windows lane mirrors that proven
+path plus the existing Windows harness idioms (`cygpath`, `qconsole.log`,
+background-run-and-kill from `20-engine.sh`), and its structure was validated on
+macOS, but it has **not yet been run on a Windows host** — treat it as pending a
+green run in the Parallels Win11 VM / on `windows-11-arm` CI. Likely first
+wrinkles to watch there: MSYS2 `kill` semantics against a native PE and any
+`WER`/console-allocation behaviour under `-dedicated`.
 
 ## Scope principle (what we build vs. defer)
 
@@ -175,7 +196,6 @@ Per the scope principle, keep extending **headless, platform-identical**
 robustness/conformance lanes (things that must behave the same on all three
 targets and can be validated on each):
 
-- `windows/tests/60-behaviour.sh` stub once `windows/` exists (mirror this).
 - LibreQuake historical-mod / total-conversion **load** matrix (server-side load
   only; GPL+CC0, fetched on demand, never committed) — the load is
   platform-identical; anything needing a client stays deferred.
