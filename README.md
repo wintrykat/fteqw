@@ -115,6 +115,11 @@ and a portable `FTEQW-<ver>-win-arm64.zip`. An optional Inno Setup installer is
 `%LOCALAPPDATA%\FTEQW\id1\…` — this repo ships **no** game content. Run the tests
 with `./windows/tests/run.sh`.
 
+The package ships **D3D11 as the default renderer** (`fte/autoexec.cfg`): the
+merged binary would otherwise auto-select OpenGL, which is the weak WoA fallback
+and misrenders on the Parallels virtual GPU (red/green font fringing). On a real
+Adreno device you can switch to Vulkan — edit that one line to `vid_renderer vk`.
+
 > **The GPU-testing caveat — read this.** Automated CI/VM proves build, packaging,
 > self-containment, headless engine-run, and that both renderers are compiled in
 > **on a virtual GPU**. It does **not** prove real rendering: neither the

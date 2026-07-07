@@ -25,6 +25,24 @@ cp "$BIN" "$PKG/fteqw.exe"
 for p in "${plugins[@]}"; do cp "$ENGINE/release/fteplug_${p}_x64.dll" "$PKG/fteplug_$p.dll"; done
 ok "engine + ${#plugins[@]} plugin(s) copied (renamed to arm64-neutral names)"
 
+# --- default renderer: D3D11 -------------------------------------------------
+# The merged binary otherwise auto-selects OpenGL, which is the weak/fallback path
+# on Windows-on-ARM and misrenders on the Parallels virtual GPU (red/green font
+# fringing). D3D11 is the universal, reliable default (brief §1). We ship it as an
+# autoexec.cfg in FTE's base "fte" gamedir — it runs last in the config order
+# (default.cfg → config.cfg → autoexec.cfg), so it reliably wins. A real-device
+# owner can switch to Vulkan by editing this one line.
+mkdir -p "$PKG/fte"
+cat > "$PKG/fte/autoexec.cfg" <<'CFG'
+// FTEQW Windows-on-ARM default: prefer the D3D11 renderer.
+// D3D11 is the universal, reliable path on Windows-on-ARM (and the only one
+// validated on the Parallels virtual GPU — OpenGL misrenders there). On a real
+// Adreno device you may switch to Vulkan for best results: change the line below
+// to `vid_renderer vk`, or delete it to use the engine's own default.
+vid_renderer d3d11
+CFG
+ok "default renderer set to D3D11 (fte/autoexec.cfg)"
+
 # --- DLL closure -------------------------------------------------------------
 # Union the recursive dependency closure of the exe AND every plugin (plugins are
 # dlopen'd at runtime, so their deps — notably ffmpeg's avcodec/avformat/avutil/

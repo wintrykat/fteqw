@@ -179,3 +179,39 @@ Setup installer (skipped gracefully if `ISCC` isn't installed). The portable ZIP
 from `build-all.sh` is the always-ship artifact. Installers are **unsigned** —
 fine for testing, but unsigned installers trip **SmartScreen**; sign with an
 EV/OV Authenticode cert for real distribution. Not a blocker.
+
+---
+
+## 8. Default renderer: D3D11 (shipped `fte/autoexec.cfg`)
+
+**Symptom.** Out of the box the merged binary auto-selects **OpenGL**
+(`GL_RENDERER: Parallels using Apple … (Compat)`), and on the Parallels virtual
+GPU the GL 2D/text path misrenders — each glyph is split into red/green shifted
+copies (chromatic-fringed menu text). D3D11 renders the same text cleanly.
+
+**Cause.** WoA's OpenGL is the weak/fallback path (brief §1), and Parallels' GL
+translation mishandles the font-glyph sampling. It is **not** a stereo/FXAA/sRGB/
+gamma cvar (all confirmed off/default; the fringing persists with
+`vid_hardwaregamma 0/2/3`) and **not** a defect in the build — it is a virtual-GPU
+GL-path artifact. Whether it also occurs on a real Adreno GPU is **unverified**
+(Tier 2/3).
+
+**Fix.** `make-package.sh` ships `fte/autoexec.cfg` containing `vid_renderer
+d3d11`. Config exec order is `default.cfg → config.cfg → autoexec.cfg`, so the
+autoexec (in FTE's base `fte` gamedir) runs last and reliably wins. A shipped
+`default.cfg` would be shadowed by id1's pak `default.cfg`, which is why autoexec
+is used. Verified: a default headless launch then reports `Direct3D11 renderer
+initialized` instead of OpenGL. Guarded by `50-package.sh` (asserts the config
+ships and sets d3d11).
+
+**Real-device note.** On a real Adreno device, Vulkan is preferred — edit the one
+line to `vid_renderer vk` (see `docs/HARDWARE-TESTING.md`).
+
+## 9. Known minor issues (not blockers)
+
+- **OpenGL text fringing on the virtual GPU** — see §8. Mitigated by the D3D11
+  default; a real-hardware GL check is Tier 2/3.
+- **D3D11 `screenshot` output is vertically flipped** — the readback doesn't
+  account for D3D's top-left origin. Cosmetic; affects only saved screenshots
+  (via the `screenshot` command), not the live display or gameplay. Left as-is to
+  keep the fork thin (an engine-side fix would be an upstream change).

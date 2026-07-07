@@ -9,6 +9,12 @@ check    "plugins renamed (fteplug_ffmpeg.dll)" test -f "$PKG/fteplug_ffmpeg.dll
 check    "no leftover fteqw64.exe"       bash -c "! test -e '$PKG/fteqw64.exe'"
 check    "no leftover _x64 plugin names" bash -c "! ls '$PKG'/*_x64.dll >/dev/null 2>&1"
 
+# Default renderer must be D3D11 — the merged binary otherwise auto-selects the
+# weak OpenGL path, which misrenders on the virtual GPU (red/green font fringing).
+check    "ships D3D11 default (fte/autoexec.cfg)" test -f "$PKG/fte/autoexec.cfg"
+contains "default renderer is d3d11"     "vid_renderer d3d11" \
+         "$(cat "$PKG/fte/autoexec.cfg" 2>/dev/null)"
+
 # Some non-system DLLs were bundled (closure is non-empty).
 nbundled="$(ls "$PKG"/*.dll 2>/dev/null | wc -l | tr -d ' ')"
 check    "non-system DLLs bundled"       test "$nbundled" -gt 0
