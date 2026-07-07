@@ -60,30 +60,56 @@ BASEDIR="$(cd "$FIXTURE/.." && pwd)"   # parent of the ftetest gamedir
 to_native(){ if command -v cygpath >/dev/null 2>&1; then cygpath -m "$1"; else printf '%s' "$1"; fi; }
 BASEDIR_ARG="$(to_native "$BASEDIR")"
 
+# kill_hard <pid> — kill a possibly-native process. An MSYS SIGKILL does not
+# always reap a native Windows PE, so fall back to taskkill on its Windows PID
+# (/proc/<pid>/winpid). Both the taskkill and the winpid lookup are absent on
+# macOS/Linux, so this degrades to a plain kill -9 there.
+kill_hard(){
+	kill -9 "$1" 2>/dev/null
+	if command -v taskkill >/dev/null 2>&1; then
+		wpid="$(cat /proc/"$1"/winpid 2>/dev/null || echo "$1")"
+		taskkill //F //T //PID "$wpid" >/dev/null 2>&1 || true
+	fi
+}
+
 # run_headless <secs> <logfile> <extra engine args...>
 # Runs the dedicated server with the fixture; kills it after <secs> if it hangs.
 # Sets HUNG=1 if it had to be killed, RC to the exit code otherwise.
 #
-# Console output is captured via -condebug into qconsole.log under FTEHOME and
-# folded into <logfile>. We read qconsole.log rather than stdout because the
-# Windows engine is a GUI-subsystem .exe that AllocConsole()s in dedicated mode
-# and writes little to a redirected stdout; qconsole.log works identically on
-# every platform (FTEHOME is honoured cross-platform, engine/common/fs.c).
+# Console output is captured via -condebug into qconsole.log inside a private home
+# dir and folded into <logfile>. We read qconsole.log rather than stdout because
+# the Windows engine is a GUI-subsystem .exe that AllocConsole()s in dedicated
+# mode and writes little to a redirected stdout.
+#
+# Three details make this behave identically on every target (all no-ops on
+# macOS/Linux, where the lane was already green):
+#   * -homedir <home>   pins the home dir on ALL platforms. FTEHOME (kept below)
+#     is honoured on unix but NOT on Windows (engine/common/fs.c: the Win32
+#     FS_GetBestHomeDir ignores it and picks %LOCALAPPDATA%), so without -homedir
+#     the Windows log escapes to %LOCALAPPDATA% and the suite never finds it.
+#   * +set log_enable 1 after +game re-arms the console log. Changing game
+#     (+game ftetest) re-execs configs and clears the -condebug log-enable on
+#     Windows, silently dropping every line after the remount; re-setting it is a
+#     harmless no-op on macOS/Linux where it is already 1.
+#   * we cat EVERY qconsole.log under <home> — the writable game dir resolves to
+#     the home root on unix but to <home>/<game>/ on Windows, so the file's exact
+#     subdir differs per platform. Gathering all of them is platform-agnostic.
 run_headless(){
 	secs="$1"; log="$2"; shift 2
 	home="$(mktemp -d 2>/dev/null || echo /tmp/ftebeh.$$)"
 	mkdir -p "$home"
+	homearg="$(to_native "$home")"
 	HUNG=0; RC=0
-	FTEHOME="$(to_native "$home")" "$ENGINE" -dedicated -condebug \
-		-basedir "$BASEDIR_ARG" +game ftetest "$@" >"$log" 2>&1 &
+	FTEHOME="$homearg" "$ENGINE" -dedicated -condebug -homedir "$homearg" \
+		-basedir "$BASEDIR_ARG" +game ftetest +set log_enable 1 "$@" >"$log" 2>&1 &
 	p=$!
 	i=0
 	while kill -0 "$p" 2>/dev/null; do
-		i=$((i+1)); [ "$i" -ge "$secs" ] && { kill -9 "$p" 2>/dev/null; HUNG=1; break; }
+		i=$((i+1)); [ "$i" -ge "$secs" ] && { kill_hard "$p"; HUNG=1; break; }
 		sleep 1
 	done
 	wait "$p" 2>/dev/null; RC=$?
-	[ -f "$home/qconsole.log" ] && cat "$home/qconsole.log" >> "$log" 2>/dev/null
+	find "$home" -name qconsole.log -exec cat {} + >> "$log" 2>/dev/null
 	rm -rf "$home"
 }
 
@@ -140,17 +166,23 @@ for bad in badver trunc; do
 	fi
 	BLOG="$(mktemp)"
 	run_headless "$TMO" "$BLOG" +map "$bad" +quit
-	graceful=1; why=""
-	if [ "$HUNG" = 1 ]; then graceful=0; why="hung on bad map"; fi
-	# a SIGSEGV/SIGABRT death shows up as RC>=128 (not from our kill, since HUNG=0)
+	graceful=1; why=""; diagnosed=0
+	if grep -aqiE "couldn't load|not found or couldn|unrecognised|corrupt|bad version" "$BLOG"; then diagnosed=1; fi
+	# Graceful rejection of a bad STARTUP map means the engine diagnoses the fault
+	# and drops to an idle dedicated console (host_abort recovery) — it must NOT
+	# crash. On macOS/Linux that idle server exits on its own; the Windows engine
+	# AllocConsole()s a console whose stdin the harness can't reach, so it idles
+	# until the safety-net kill (HUNG=1). Both are graceful, so a hang counts
+	# against us only when NO diagnostic was printed (a genuine lock-up on load).
+	# A crash is always a failure, however it surfaces.
 	if [ "$HUNG" = 0 ] && [ "$RC" -ge 128 ]; then
 		graceful=0; why="${why:+$why; }engine crashed (rc=$RC, signal $((RC-128)))"
 	fi
 	if grep -aqiE 'segmentation|sigsegv|sigabrt|assertion failed' "$BLOG"; then
 		graceful=0; why="${why:+$why; }crash marker in log"
 	fi
-	if ! grep -aqiE "couldn't load|not found or couldn|unrecognised|corrupt|bad version" "$BLOG"; then
-		graceful=0; why="${why:+$why; }no diagnostic error message"
+	if [ "$diagnosed" = 0 ]; then
+		graceful=0; why="${why:+$why; }$([ "$HUNG" = 1 ] && echo 'hung with no diagnostic' || echo 'no diagnostic error message')"
 	fi
 	if [ "$graceful" = 1 ]; then emit_pass "badmap_$bad"; else emit_fail "badmap_$bad" "$why"; fi
 	rm -f "$BLOG"

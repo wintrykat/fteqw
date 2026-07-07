@@ -101,21 +101,54 @@ harness's `pass`/`fail` counters, so all three test sets now mirror each other
 **One runner, three targets.** The suite reads console output from `-condebug`'s
 `qconsole.log` (not stdout) because the Windows engine is a GUI-subsystem `.exe`
 that `AllocConsole()`s in dedicated mode and writes little to a redirected
-stdout; `FTEHOME` is honoured cross-platform (`engine/common/fs.c`), so the log
-lands in the temp home dir on every OS. Filesystem args (`-basedir`, `FTEHOME`)
-are `cygpath`-converted to Windows form when `cygpath` is present — a no-op on
-macOS/Linux. The Windows wrapper drives the packaged `fteqw.exe` (dev fallback
+stdout. Getting that one log captured identically everywhere took three
+platform-neutral touches in `run_headless` (each a no-op on macOS/Linux, where
+the lane was already green):
+
+- **`-homedir <tmp>` pins the home dir on every OS.** `FTEHOME` is honoured on
+  unix but **not** on Windows — the Win32 `FS_GetBestHomeDir` (`engine/common/fs.c`)
+  ignores it and picks `%LOCALAPPDATA%`, so the log escaped the suite's temp dir.
+  `-homedir` is common engine code and is obeyed on all three targets.
+- **`+set log_enable 1` after `+game` re-arms the console log.** Changing game
+  (`+game ftetest`) re-execs configs and clears the `-condebug` log-enable on
+  Windows, silently dropping every line after the remount; re-setting it is a
+  harmless no-op on macOS/Linux where it is already `1`.
+- **We concatenate _every_ `qconsole.log` under the home dir.** The writable game
+  dir resolves to the home root on unix but to `<home>/<game>/` on Windows, so
+  the file's exact subdir differs per platform; gathering all of them is
+  platform-agnostic.
+
+Filesystem args (`-basedir`, `-homedir`) are `cygpath`-converted to Windows form
+when `cygpath` is present — a no-op on macOS/Linux. The safety-net kill uses a
+`taskkill //PID` fallback (via `/proc/<pid>/winpid`) because an MSYS2 `SIGKILL`
+does not always reap a native PE; that too degrades to a plain `kill -9` off
+Windows. The Windows wrapper drives the packaged `fteqw.exe` (dev fallback
 `engine/release/fteqw64.exe`) against the committed fixtures (so no python/fteqcc
 on the Windows host), and Windows CI already runs `windows/tests/run.sh`.
 
-**Verification status (honest):** the shared runner is green on macOS (and, by the
-identical POSIX path, expected on Linux). The Windows lane mirrors that proven
-path plus the existing Windows harness idioms (`cygpath`, `qconsole.log`,
-background-run-and-kill from `20-engine.sh`), and its structure was validated on
-macOS, but it has **not yet been run on a Windows host** — treat it as pending a
-green run in the Parallels Win11 VM / on `windows-11-arm` CI. Likely first
-wrinkles to watch there: MSYS2 `kill` semantics against a native PE and any
-`WER`/console-allocation behaviour under `-dedicated`.
+One behavioural nuance the port surfaced: a bad **startup** map is rejected via
+the `host_abort` recovery (see the SV_Init fix below), which diagnoses the fault
+and drops the dedicated server to an idle console rather than crashing. On
+macOS/Linux that idle server exits on its own; the Windows engine `AllocConsole()`s
+a console whose stdin the harness can't reach, so it idles until the safety-net
+kill. Both are graceful, so the bad-map lane now treats a hang as a failure only
+when **no** diagnostic was printed (a genuine lock-up) — a crash is always a
+failure. This keeps the assertion identical in intent on all three targets.
+
+**Verification status (honest):** the shared runner is **green on macOS and on
+Windows-on-ARM**; Linux is expected green by the identical POSIX path but is not
+yet run on a real host. The Windows run was done on **arm64 Windows 11
+(10.0.26200.8653)** under **MSYS2 `CLANGARM64`** (clang 22.1.8) against commit
+`1756c68a8`, on **2026-07-07**: `./windows/tests/run.sh` reports
+`passed: 42  failed: 0  skipped: 4` with all 12 `behaviour:*` lines green (data-
+and real-GPU tests skip, as on CI). The three `run_headless` touches and the
+bad-map graceful criterion above are exactly the fixes that first green run
+required — the lane as authored on macOS could not capture the log on Windows at
+all (`FTEHOME` ignored + log-enable cleared on remount) and hung on the bad-map
+lanes. **Caveat:** run the suite inside a **native MSYS2 shell** so `/bin/sh`,
+`mktemp`, `find`, `kill` and `cygpath` all share one msys runtime; mixing a
+Git-for-Windows `/bin/sh` with MSYS2 coreutils on `PATH` gives them different
+`/tmp` mounts and PID namespaces and the capture breaks spuriously.
 
 ## Scope principle (what we build vs. defer)
 

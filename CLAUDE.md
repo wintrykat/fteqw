@@ -92,8 +92,12 @@ it *behaves*. It drives the engine headless against an original, licensing-clean
 fixture and asserts real behaviour — **no id data**, so unlike the old
 `HAVE_DATA`-gated checks it actually runs in CI.
 
-**Landed & verified** (8/8 against the freshly-built engine; wired into both
-`macos/tests/run.sh` and `linux/tests/run.sh` via auto-discovery):
+**Landed & verified** (12/12 against the freshly-built engine — green on **macOS
+and Windows-on-ARM** on real hardware; Linux expected green by the identical POSIX
+path, not yet run on a real host; wired into `macos/`, `linux/` and
+`windows/tests/run.sh` via auto-discovery. Windows run: arm64 Win11
+`10.0.26200.8653`, MSYS2 `CLANGARM64`, commit `1756c68a8`, 2026-07-07,
+`run.sh` → `passed: 42  failed: 0`):
 - `fixtures/ftetest/` — original **GPL/CC0** test gamedir (own `LICENSE`, no id
   content): `tools/gen_bsp.py` (zero-dependency BSP29 generator) + human-editable
   `maps/ftetest.map`; `tools/gen_assets.py` (original `.mdl`/`.spr`/`.wav` under
@@ -114,8 +118,16 @@ fixture and asserts real behaviour — **no id data**, so unlike the old
   `tools/gen_bad.py`; `maps/ftetest2.bsp` is a filename-distinct copy. Emits
   `BEHAVIOUR-{PASS,FAIL,SKIP}` lines the wrappers fold into pass/fail counts. It
   reads console output via `-condebug`'s `qconsole.log` (a Windows GUI `.exe`
-  writes little to a redirected stdout) and cygpath-converts paths on Windows —
-  no-op on macOS/Linux — so the one runner works on all three targets.
+  writes little to a redirected stdout). Capturing that log identically on all
+  three targets needs three platform-neutral touches in `run_headless`, each a
+  no-op off Windows: **`-homedir`** pins the home dir (Win32 ignores `FTEHOME`);
+  **`+set log_enable 1` after `+game`** re-arms the log the game-remount clears on
+  Windows; and it **concatenates every `qconsole.log` under the home dir** (the
+  writable game dir is the home root on unix but `<home>/<game>/` on Windows).
+  Paths are cygpath-converted on Windows, and the safety-net kill has a
+  `taskkill //PID` fallback. The bad-map lane treats the engine's graceful
+  drop-to-idle-console (host_abort recovery) as a pass — a hang is a failure only
+  with **no** diagnostic. See `docs/PORTING-TESTING.md`.
 - `macos/tests/60-behaviour.sh`, `linux/tests/60-behaviour.sh`,
   `windows/tests/60-behaviour.sh` — thin wrappers; all three test sets now mirror
   each other `10`→`60`. The Windows wrapper uses the packaged `fteqw.exe` (dev
