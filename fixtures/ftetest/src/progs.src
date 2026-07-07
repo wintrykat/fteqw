@@ -1,0 +1,7 @@
+// progs.src -- build recipe for the ftetest self-reporting server progs.
+// Compiled with fteqcc; output lands next to the fixture as ../progs.dat.
+// New-style progs.src: first non-comment char must be '#'.
+#pragma PROGS_DAT ../progs.dat
+
+#include "defs.qc"
+#include "test.qc"

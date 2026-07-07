@@ -1,0 +1,17 @@
+The ftetest fixture -- original test content for the FTEQW arm64 fork
+======================================================================
+
+Copyright (C) 2026 Kat Aurelia and the fteqw-upstream contributors.
+
+This fixture (the QuakeC sources under src/, the map source maps/ftetest.map,
+the BSP generator tools/gen_bsp.py, the generated maps/ftetest.bsp and progs.dat,
+and the generated model/sprite/sound assets) is original authorship created for
+the purpose of exercising the FTEQW engine in an automated test suite.
+
+It contains NO id Software game data of any kind. It is licensed under the
+GNU General Public License, version 2 or later (GPL-2.0-or-later), matching the
+rest of this repository. See ../../LICENSE for the full text.
+
+The Quake progs<->engine ABI reflected in src/defs.qc (global/field names and
+ordering, standard builtin numbers) is a functional interface, not a creative
+work; the reference implementation is FTE's own GPL basemod (quakec/basemod/).

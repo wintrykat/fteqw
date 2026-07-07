@@ -1,0 +1,4 @@
+# runtime byproducts if the engine is pointed at -basedir fixtures directly
+installed.lst
+qconsole.log
+*.log

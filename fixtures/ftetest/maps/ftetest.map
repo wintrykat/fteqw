@@ -1,0 +1,74 @@
+// ftetest.map -- human-editable source for the behavioural-test room.
+//
+// A single hollow 512^3 room (interior +/-256) with 16-unit walls, one
+// info_player_start, and worldspawn. Compile with ericw-tools qbsp (see
+// ../compile.sh) to regenerate maps/ftetest.bsp. The committed .bsp is produced
+// either by that path or, when no qbsp is installed, by tools/gen_bsp.py, which
+// emits an equivalent room. 100% original authorship -- no id Software content.
+//
+// Brush plane triples wind clockwise as seen from the front, so face normals
+// point out of each solid wall (standard Quake .map convention).
+{
+"classname" "worldspawn"
+"message" "ftetest"
+"wad" ""
+// floor
+{
+( -272 -272 -272 ) ( -272 272 -272 ) ( -272 272 -256 ) ftetest 0 0 0 1 1
+( 272 272 -272 ) ( 272 -272 -272 ) ( 272 -272 -256 ) ftetest 0 0 0 1 1
+( -272 -272 -272 ) ( 272 -272 -272 ) ( 272 -272 -256 ) ftetest 0 0 0 1 1
+( 272 272 -272 ) ( -272 272 -272 ) ( -272 272 -256 ) ftetest 0 0 0 1 1
+( -272 -272 -272 ) ( -272 272 -272 ) ( 272 272 -272 ) ftetest 0 0 0 1 1
+( 272 -272 -256 ) ( -272 -272 -256 ) ( -272 272 -256 ) ftetest 0 0 0 1 1
+}
+// ceiling
+{
+( -272 -272 256 ) ( -272 272 256 ) ( -272 272 272 ) ftetest 0 0 0 1 1
+( 272 272 256 ) ( 272 -272 256 ) ( 272 -272 272 ) ftetest 0 0 0 1 1
+( -272 -272 256 ) ( 272 -272 256 ) ( 272 -272 272 ) ftetest 0 0 0 1 1
+( 272 272 256 ) ( -272 272 256 ) ( -272 272 272 ) ftetest 0 0 0 1 1
+( -272 -272 256 ) ( -272 272 256 ) ( 272 272 256 ) ftetest 0 0 0 1 1
+( 272 -272 272 ) ( -272 -272 272 ) ( -272 272 272 ) ftetest 0 0 0 1 1
+}
+// west wall (-x)
+{
+( -272 -272 -256 ) ( -272 272 -256 ) ( -272 272 256 ) ftetest 0 0 0 1 1
+( -256 272 -256 ) ( -256 -272 -256 ) ( -256 -272 256 ) ftetest 0 0 0 1 1
+( -272 -272 -256 ) ( -256 -272 -256 ) ( -256 -272 256 ) ftetest 0 0 0 1 1
+( -256 272 -256 ) ( -272 272 -256 ) ( -272 272 256 ) ftetest 0 0 0 1 1
+( -272 -272 -256 ) ( -272 272 -256 ) ( -256 272 -256 ) ftetest 0 0 0 1 1
+( -256 -272 256 ) ( -272 -272 256 ) ( -272 272 256 ) ftetest 0 0 0 1 1
+}
+// east wall (+x)
+{
+( 256 -272 -256 ) ( 256 272 -256 ) ( 256 272 256 ) ftetest 0 0 0 1 1
+( 272 272 -256 ) ( 272 -272 -256 ) ( 272 -272 256 ) ftetest 0 0 0 1 1
+( 256 -272 -256 ) ( 272 -272 -256 ) ( 272 -272 256 ) ftetest 0 0 0 1 1
+( 272 272 -256 ) ( 256 272 -256 ) ( 256 272 256 ) ftetest 0 0 0 1 1
+( 256 -272 -256 ) ( 256 272 -256 ) ( 272 272 -256 ) ftetest 0 0 0 1 1
+( 272 -272 256 ) ( 256 -272 256 ) ( 256 272 256 ) ftetest 0 0 0 1 1
+}
+// south wall (-y)
+{
+( -256 -272 -256 ) ( -256 -256 -256 ) ( -256 -256 256 ) ftetest 0 0 0 1 1
+( 256 -256 -256 ) ( 256 -272 -256 ) ( 256 -272 256 ) ftetest 0 0 0 1 1
+( -256 -272 -256 ) ( 256 -272 -256 ) ( 256 -272 256 ) ftetest 0 0 0 1 1
+( 256 -256 -256 ) ( -256 -256 -256 ) ( -256 -256 256 ) ftetest 0 0 0 1 1
+( -256 -272 -256 ) ( -256 -256 -256 ) ( 256 -256 -256 ) ftetest 0 0 0 1 1
+( 256 -272 256 ) ( -256 -272 256 ) ( -256 -256 256 ) ftetest 0 0 0 1 1
+}
+// north wall (+y)
+{
+( -256 256 -256 ) ( -256 272 -256 ) ( -256 272 256 ) ftetest 0 0 0 1 1
+( 256 272 -256 ) ( 256 256 -256 ) ( 256 256 256 ) ftetest 0 0 0 1 1
+( -256 256 -256 ) ( 256 256 -256 ) ( 256 256 256 ) ftetest 0 0 0 1 1
+( 256 272 -256 ) ( -256 272 -256 ) ( -256 272 256 ) ftetest 0 0 0 1 1
+( -256 256 -256 ) ( -256 272 -256 ) ( 256 272 -256 ) ftetest 0 0 0 1 1
+( 256 256 256 ) ( -256 256 256 ) ( -256 272 256 ) ftetest 0 0 0 1 1
+}
+}
+{
+"classname" "info_player_start"
+"origin" "0 0 -216"
+"angle" "0"
+}

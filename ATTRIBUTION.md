@@ -20,15 +20,23 @@ that summary; all files added by this fork are GPL-2.0.
 | File | Change | Date |
 |------|--------|------|
 | `engine/vk/vk_init.c` | Added `#include <limits.h>` so `UINT_MAX` resolves under clang/macOS when building with `-DVKQUAKE`. One inserted line; no behavioural change. | 2026-07-05 |
+| `engine/server/sv_main.c` | Establish a `setjmp(host_abort)` recovery point in `SV_Init` before the dedicated startup command buffer runs. Without it, a bad/missing `+map` on the command line (`Mod_LoadModel` → `Host_EndGame` → `longjmp`) longjmps through an **uninitialised** `jmp_buf` and SIGSEGVs at startup instead of printing the error. Robustness fix; the normal good-map path is unchanged. Found by the behavioural test suite (`tests/behaviour/`, fixture `fixtures/ftetest/`); reported upstream (`docs/upstream/dedicated-startup-badmap-crash.md`). | 2026-07-07 |
 
-That is the **only** modified upstream source file — for **all** platforms,
-including the Linux/arm64 AppImage, which needs no engine or Makefile edit at all
-(Linux is FTEQW's native `m-rel FTE_TARGET=SDL2` path; the `<limits.h>` line above
-is a harmless no-op there). Confirm at any time with:
+These are the **only** modified upstream source files. The `vk_init.c` line is a
+build fix; the `sv_main.c` block is a crash fix the fork's new behavioural tests
+surfaced and now guard — it is being submitted upstream, and the fork edit can be
+dropped once upstream carries the fix. Neither affects the Linux/arm64 AppImage
+build (Linux is FTEQW's native `m-rel FTE_TARGET=SDL2` path); the `sv_main.c` fix
+is platform-neutral and benefits every dedicated build. Confirm the full set of
+engine edits at any time with:
 
 ```sh
-git diff --stat            # should show engine/vk/vk_init.c | 1 +
+git diff --stat engine/    # engine/vk/vk_init.c | 1 + ; engine/server/sv_main.c | 18 +
 ```
+
+Each engine edit is guarded by a test that goes red if it regresses (house rule:
+*every workaround gets a test*) — `macos/tests` / `linux/tests` for the build fix,
+`tests/behaviour` for the crash fix.
 
 ## Files added by this fork (all GPL-2.0)
 
@@ -37,6 +45,11 @@ git diff --stat            # should show engine/vk/vk_init.c | 1 +
 - `docs/PORTING-LINUX.md`, `docs/BUILDING-LINUX.md` — Linux AppImage workaround docs + build guide
 - `macos/scripts/*`, `macos/tests/*` — macOS reproducible build, packaging, and test suite
 - `linux/scripts/*`, `linux/tests/*` — Linux AppImage build, packaging, and test suite
+- `tests/behaviour/*` — platform-neutral runtime **behavioural** test suite (drives the
+  engine headless and asserts it loads maps, runs QuakeC, and fails gracefully)
+- `fixtures/ftetest/*` — original, licensing-clean test gamedir (map, QuakeC, generator);
+  contains **no** id Software data (see `fixtures/ftetest/LICENSE`)
+- `docs/upstream/*` — bug reports prepared for submission to upstream FTEQW
 - `.github/*` — CI (macOS + Linux) and issue templates
 - `ATTRIBUTION.md`, `CONTRIBUTING.md`, `.gitignore`
 

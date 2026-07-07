@@ -6690,6 +6690,24 @@ void SV_Init (quakeparms_t *parms)
 		Cvar_ParseWatches();
 		host_initialized = true;
 
+		{
+			// fteqw-arm64 fork: on the dedicated startup path the +command line
+			// (Cmd_StuffCmds -> Cbuf_Execute) and the initial map run before any
+			// host_abort recovery point is established, so a bad/missing +map
+			// (Mod_LoadModel -> Host_EndGame -> longjmp) longjmps through an
+			// uninitialised jmp_buf and SIGSEGVs instead of printing the error.
+			// Establish the recovery point here, before any startup command can
+			// execute (mirrors the client-side setjmp(host_abort) in
+			// Host_Init/Host_Frame), so a failed startup command drops to the
+			// dedicated console instead of crashing.
+			// See docs/PORTING.md (Engine edits) and ATTRIBUTION.md.
+			extern jmp_buf host_abort;
+			if (setjmp (host_abort))
+			{
+				Con_Printf (CON_ERROR "Startup command aborted; server idle at console.\n");
+				return;
+			}
+		}
 
 		manarg = COM_CheckParm("-manifest");
 		if (manarg && manarg < com_argc-1 && com_argv[manarg+1])
