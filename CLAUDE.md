@@ -3,8 +3,10 @@
 ## What this repo is
 A thin, native **arm64** fork of [FTEQW](https://github.com/fte-team/fteqw) that
 packages the engine per-platform. **macOS/Apple Silicon is done and shipping**
-(see `macos/`, `docs/PORTING.md`). **Windows-on-ARM is the current task** — the
-full implementation brief is `docs/WINDOWS-ARM-PORT.md`; read it first.
+(see `macos/`, `docs/PORTING.md`). **Linux/arm64 (AppImage) is a first-class
+target** (see `linux/`, `docs/PORTING-LINUX.md`) — scaffolded, pending
+verification in an arm64 Ubuntu VM. **Windows-on-ARM is the other in-flight
+task** — the full implementation brief is `docs/WINDOWS-ARM-PORT.md`.
 
 Everything is **GPL-2.0** (inherited from FTEQW / Quake). The engine source is
 changed by exactly **one line** (`engine/vk/vk_init.c`); keep it that way.
@@ -32,17 +34,33 @@ The macOS layer is the template for the Windows layer:
 - `macos/tests/{assert,run,10-toolchain,20-engine,30-renderers,40-plugins,50-bundle}.sh`
 - `docs/PORTING.md` (the "why + how to reconstruct" for each workaround)
 
-Reproduce this structure and discipline under `windows/`.
+Reproduce this structure and discipline under `windows/`. The `linux/` layer
+already mirrors it (`linux/scripts/*`, `linux/tests/*`, `docs/PORTING-LINUX.md`).
 
 ## Environment
 - **macOS:** Homebrew (`/opt/homebrew`), clang, `FTE_TARGET=SDL2`, merged
   `m-rel` (GL+Vulkan), Vulkan via **bundled MoltenVK**. Arch triple:
   `clang -dumpmachine` = `arm64-apple-darwin*`.
+- **Linux/arm64:** distro apt (Homebrew analog), `FTE_TARGET=SDL2`, merged
+  `m-rel`. Triple `aarch64-linux-gnu`. Packaged as a self-contained `.AppImage`
+  via **linuxdeploy + appimagetool** (the `dylibbundler` analog). Vulkan/OpenGL
+  come from the **host GPU driver** — do NOT bundle the GL/Vulkan/X11/Wayland
+  stack (same stance as Windows). **Zero** engine/Makefile edits needed.
 - **Windows-on-ARM:** MSYS2 **`CLANGARM64`** (pacman) is the recommended
   toolchain (Homebrew analog); triple `aarch64-w64-mingw32`. Default renderer
   **D3D11**; **Vulkan** for real Adreno hardware and is provided by the GPU
   **driver** (do NOT bundle a Vulkan runtime — there is no MoltenVK equivalent to
   ship). Install Git for Windows so the Bash tool works.
+
+## Linux/arm64 AppImage: start here
+Scaffolded under `linux/`; read `docs/PORTING-LINUX.md` first. Verify in an
+**arm64 Ubuntu VM in Parallels** (setup steps in `docs/BUILDING-LINUX.md`) —
+`./linux/scripts/build-all.sh --install` then `./linux/tests/run.sh`. Nothing has
+been run yet on a real Linux host, so treat every "it builds/passes" claim as
+**unverified** until the VM (or the `ubuntu-24.04-arm` CI job) is green. The one
+Linux-specific edge over macOS/Windows: Mesa's **software rasterisers** (llvmpipe
+GL / lavapipe Vulkan) let the Vulkan loader + renderer-init tests actually run
+headless in the VM/CI — real-GPU rendering still stays Tier 2/manual.
 
 ## Windows-on-ARM: start here
 A host-side recon is recorded in `docs/WINDOWS-ARM-PORT.md` §0.5. Key points:
