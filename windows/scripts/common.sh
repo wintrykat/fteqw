@@ -31,6 +31,11 @@ CAWIN="$(cygpath -m "$CLANGARM64" 2>/dev/null || echo "$CLANGARM64")"
 # MSYS2 pacman packages we depend on, split by role (CLANGARM64 prefix).
 CA=mingw-w64-clang-aarch64
 BUILD_PACKAGES=(make zip "$CA-clang" "$CA-lld" "$CA-pkgconf" "$CA-ntldd-git")
+# Base MSYS2 tools the scripts invoke that aren't always present on a fresh MSYS2
+# (e.g. GitHub's setup-msys2): unzip verifies embedded plugin metadata, git
+# stamps the version. Checked by command (they may be loose files, not pacman-
+# owned) and installed as packages when missing.
+BASE_TOOLS=(unzip git)
 LIB_PACKAGES=("$CA-SDL2" "$CA-libpng" "$CA-libjpeg-turbo" "$CA-libogg" "$CA-libvorbis" \
               "$CA-freetype" "$CA-opus" "$CA-speex" "$CA-speexdsp" "$CA-zlib")
 VULKAN_PACKAGES=("$CA-vulkan-headers" "$CA-vulkan-loader")
@@ -96,12 +101,15 @@ ensure_packages() {
   for p in "${pkgs[@]}"; do
     pacman -Q "$p" >/dev/null 2>&1 || missing+=("$p")
   done
-  if (( ${#missing[@]} )); then
+  # Base tools checked by command availability (they may be loose, not pacman-owned).
+  local missing_tools=()
+  for t in "${BASE_TOOLS[@]}"; do have "$t" || missing_tools+=("$t"); done
+  if (( ${#missing[@]} || ${#missing_tools[@]} )); then
     if (( install )); then
-      log "installing missing packages: ${missing[*]}"
-      pacman -S --needed --noconfirm "${missing[@]}"
+      log "installing missing packages: ${missing[*]} ${missing_tools[*]}"
+      pacman -S --needed --noconfirm "${missing[@]}" "${missing_tools[@]}"
     else
-      die "missing MSYS2 packages: ${missing[*]}  (run with --install, or: pacman -S ${missing[*]})"
+      die "missing dependencies: ${missing[*]} ${missing_tools[*]}  (run with --install, or: pacman -S ${missing[*]} ${missing_tools[*]})"
     fi
   fi
   ok "MSYS2 CLANGARM64 dependencies present"
