@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(cygpath *)",
+      "Bash(llvm-readobj *)",
+      "Bash(llvm-nm *)",
+      "Bash(ntldd *)",
+      "Bash(unzip -l *)",
+      "Bash(unzip -p *)"
+    ]
+  }
+}

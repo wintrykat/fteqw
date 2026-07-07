@@ -104,6 +104,50 @@ how to reconstruct or retire it as upstream evolves. The reproducible build
 lives in [`macos/scripts/`](macos/scripts/); the tests in
 [`macos/tests/`](macos/tests/).
 
+## Windows-on-ARM (aarch64)
+
+The same engine also builds natively for **Windows-on-ARM** — Qualcomm Snapdragon
+/ Copilot+ PCs, Surface Pro X, and similar real devices — as a self-contained
+package. Same discipline as the macOS port: thin fork, a test for every
+workaround, self-contained output, honest docs.
+
+| | |
+|---|---|
+| **Architecture** | `aarch64` / arm64 only |
+| **OS** | Windows 11 on ARM |
+| **Toolchain** | MSYS2 **CLANGARM64** (clang, `aarch64-w64-windows-gnu`) |
+| **Renderers** | **D3D11 (default)**, Vulkan, OpenGL, D3D9 — one binary, runtime-switchable |
+| **Build target** | FTEQW `FTE_TARGET=win64` + overrides — **zero Makefile/engine edits** |
+| **Plugins** | `ffmpeg` (media) and `qi` (Quaddicted map database) |
+
+```sh
+# in an MSYS2 CLANGARM64 shell, from a clone (add --install to auto-install deps):
+./windows/scripts/build-all.sh --install
+```
+
+That produces `windows/dist/FTEQW/` (self-contained — no MSYS2 needed to *run* it)
+and a portable `FTEQW-<ver>-win-arm64.zip`. An optional Inno Setup installer is
+`./windows/scripts/make-installer.sh`. Add your own Quake data under
+`%LOCALAPPDATA%\FTEQW\id1\…` — this repo ships **no** game content. Run the tests
+with `./windows/tests/run.sh`.
+
+The package ships **D3D11 as the default renderer** (`fte/autoexec.cfg`): the
+merged binary would otherwise auto-select OpenGL, which is the weak WoA fallback
+and misrenders on the Parallels virtual GPU (red/green font fringing). On a real
+Adreno device you can switch to Vulkan — edit that one line to `vid_renderer vk`.
+
+> **The GPU-testing caveat — read this.** Automated CI/VM proves build, packaging,
+> self-containment, headless engine-run, and that both renderers are compiled in
+> **on a virtual GPU**. It does **not** prove real rendering: neither the
+> development VM nor GitHub's `windows-11-arm` runners have a **real GPU** (the VM
+> caps at DirectX 11.1 / OpenGL 3.3 with **no Vulkan**). **Real D3D11 and
+> Vulkan-on-Adreno rendering are verified only via hardware-gated Tier-2 tests and
+> the manual Tier-3 checklist on actual devices** — until a device run is
+> recorded, those axes are **"unverified", not "passing"**. Unlike macOS's bundled
+> MoltenVK, **no Vulkan runtime is shipped**: on real hardware the Adreno driver
+> provides it. See [`docs/PORTING-WINDOWS.md`](docs/PORTING-WINDOWS.md) and
+> [`docs/HARDWARE-TESTING.md`](docs/HARDWARE-TESTING.md).
+
 ## Upstream & credits
 
 - **Engine:** [FTEQW](https://www.fteqw.org/) — source at

@@ -1,0 +1,89 @@
+name: build & test (Windows-on-ARM)
+
+on:
+  push:
+    branches: [ "**" ]
+  pull_request:
+  workflow_dispatch:
+  schedule:
+    # Weekly: catches upstream MSYS2 / Windows drift even without a code change.
+    - cron: "0 8 * * 1"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # Tier 1 — build, packaging, self-containment, engine-run, and both renderers
+  # compiled in. Runs on GitHub's native arm64 Windows runner. This runner has NO
+  # real GPU and no Vulkan, so the Tier-2 renderer-initialisation tests self-skip
+  # here (see docs/HARDWARE-TESTING.md for the real-device path).
+  build-test:
+    runs-on: windows-11-arm
+    defaults:
+      run:
+        shell: msys2 {0}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0   # full history + tags so `git describe` stamps a real version
+
+      - name: Set up MSYS2 CLANGARM64
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: CLANGARM64
+          update: true
+          install: >-
+            make zip unzip git
+            mingw-w64-clang-aarch64-clang
+            mingw-w64-clang-aarch64-lld
+            mingw-w64-clang-aarch64-pkgconf
+            mingw-w64-clang-aarch64-ntldd-git
+            mingw-w64-clang-aarch64-SDL2
+            mingw-w64-clang-aarch64-libpng
+            mingw-w64-clang-aarch64-libjpeg-turbo
+            mingw-w64-clang-aarch64-libogg
+            mingw-w64-clang-aarch64-libvorbis
+            mingw-w64-clang-aarch64-freetype
+            mingw-w64-clang-aarch64-opus
+            mingw-w64-clang-aarch64-speex
+            mingw-w64-clang-aarch64-speexdsp
+            mingw-w64-clang-aarch64-zlib
+            mingw-w64-clang-aarch64-vulkan-headers
+            mingw-w64-clang-aarch64-vulkan-loader
+            mingw-w64-clang-aarch64-ffmpeg
+
+      - name: Confirm native arm64 toolchain
+        run: |
+          clang -dumpmachine | grep -q aarch64 || { echo "clang is not aarch64"; exit 1; }
+          clang --version | head -1
+
+      - name: Build (engine + plugins + self-contained package + ZIP)
+        run: ./windows/scripts/build-all.sh
+
+      - name: Test (Tier 1; Tier 2 real-GPU tests self-skip — no GPU on CI)
+        run: ./windows/tests/run.sh
+
+      - name: Upload package ZIP
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: FTEQW-win-arm64
+          path: windows/dist/FTEQW-*-win-arm64.zip
+          if-no-files-found: warn
+
+  # Tier 2 — real D3D11 frame + Vulkan/Adreno on ACTUAL hardware. Needs a
+  # self-hosted runner on a Snapdragon device (with a real GPU); until one is
+  # registered this job is skipped. See docs/HARDWARE-TESTING.md.
+  hardware-test:
+    if: false   # flip to a real trigger once a GPU self-hosted runner exists
+    runs-on: [self-hosted, windows, arm64, gpu]
+    defaults:
+      run:
+        shell: msys2 {0}
+    steps:
+      - uses: actions/checkout@v7
+      - name: Test (Tier 2 enabled)
+        env:
+          FTEQW_REAL_GPU: "1"
+        run: ./windows/tests/run.sh

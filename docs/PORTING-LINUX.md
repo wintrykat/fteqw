@@ -64,6 +64,28 @@ The Makefile's default `strip --strip-unneeded` is GNU syntax and works on Linux
 so — unlike macOS — we do **not** pass `STRIP=SKIP`. Stripping keeps the AppImage
 small.
 
+### 2.4 FreeType headers via `CPATH` (the same gap macOS papers over)
+`gl_font.c` does `#include <ft2build.h>`, but the Makefile never adds FreeType's
+include dir. When `-DLINK_FREETYPE` is in play (it is, via `FTE_CONFIG_EXTRA`), the
+`LINK_FREETYPE` branch (`engine/Makefile` ~line 1053) **blanks** `FREETYPE_CFLAGS`
+and instead expects `ft2build.h` to sit in `libs-<arch>/` — a layout produced only
+by `make makelibs`, which we skip (§2.1). The distro ships those headers in a
+non-default dir (`…/freetype2`) that nothing on the default search path covers, so
+the compile dies with `ft2build.h: No such file or directory`.
+
+macOS hits the identical gap and solves it by exporting `CPATH`
+(`macos/scripts/common.sh:setup_build_env`). `build-engine.sh` mirrors that: it
+derives the FreeType include dir from `pkg-config --cflags-only-I freetype2`
+(never hardcoded) and prepends it to `CPATH`, so `#include <ft2build.h>` resolves
+with **no** Makefile edit. Opus, Vulkan and SDL2 headers are already added by the
+Makefile's own pkg-config calls — FreeType is the only one it drops.
+
+**Drift.** If FreeType headers move or the package is missing, `build-engine.sh`
+dies with a clear message (`FreeType headers not found via pkg-config`). The
+toolchain test (`10-toolchain.sh`) asserts the dir is discoverable so a red test
+points straight here; the engine build itself (`20-engine.sh`) is the end-to-end
+guard — it cannot produce a binary if this breaks.
+
 ---
 
 ## 3. The graphics stack is the host's (never bundled)
@@ -89,8 +111,33 @@ the ones the host driver was built against (the classic AppImage rendering-break
 
 - **`linuxdeploy`** is the `dylibbundler` analogue: it copies the engine's linked
   dependency closure into `usr/lib/`, sets rpath to `$ORIGIN/../lib`, and lays out
-  the AppDir. It honours the AppImage excludelist, so it will not bundle the
-  driver/ABI libraries on the ALLOWLIST.
+  the AppDir.
+- **The AppImage excludelist ≠ our ALLOWLIST — mind the gap.** linuxdeploy applies
+  the upstream *AppImage excludelist*, which is a **superset** of our ALLOWLIST: on
+  top of the driver/ABI stack it also refuses to bundle several "assumed present"
+  base libraries the engine links — `libz`, `libfreetype`, `libasound`, `libexpat`,
+  `libgpg-error`. Our self-containment policy (§3) only exempts the GPU/display
+  driver + glibc ABI, so those escapees must be bundled. Worse, because the engine
+  directly needs `libz`/`libfreetype`, the leftover **host** `libfreetype` then
+  pulls host copies of libs we *did* bundle (`libpng16`, `libbz2`, `libbrotli*`)
+  right back in. `make-appdir.sh` closes this by running `bundle_so_deps` on the
+  engine after linuxdeploy — copying the excluded remainder into `usr/lib/` with an
+  `$ORIGIN` rpath (the same helper `build-plugins.sh` uses for the ffmpeg closure).
+  Once done, the whole transitive chain resolves inside the AppDir. The
+  renderer-init test (`30-renderers.sh`, lavapipe) is the guard that a bundled
+  low-level lib does not shadow the host GL/Vulkan driver.
+- **Not every escapee is ours to bundle — host-stack transitive deps.** Four libs
+  (`libbsd`, `libmd`, `libexpat`, `libffi`) are pulled in **only** through the
+  host graphics/display stack we deliberately keep host-provided (§3):
+  `libbsd`/`libmd` via host `libX11`/`libXdmcp` and `libGL`; `libexpat` via Mesa's
+  `libGLX_mesa`; `libffi` via host `libwayland`. No **bundled** library needs them,
+  so they belong to the driver/display closure, not ours — and on any host able to
+  render they are guaranteed present. They are therefore on the **ALLOWLIST**
+  (which already enumerates that stack — `libXau`/`libXdmcp` were there; these are
+  the members it missed), so `bundle_so_deps` skips them and the audit accepts
+  them. This split is the crux: `bundle_so_deps` bundles the engine's *own*
+  excluded deps (`libz`, `libfreetype`, `libasound`, `libgpg-error`); the ALLOWLIST
+  covers deps reachable *only* via the host stack.
 - **`appimagetool`** squashes the finished AppDir into `FTEQW-<cpu>.AppImage`.
 - Both tools are themselves AppImages; `common.sh` fetches the `aarch64` builds on
   demand and runs them with `APPIMAGE_EXTRACT_AND_RUN=1` so **no FUSE** is needed
@@ -131,6 +178,29 @@ a driver/system lib, add its prefix to the ALLOWLIST with a comment.
 Plugins are installed into `usr/bin/` alongside `fteqw-engine` so FTE finds them
 by name, with their rpath pointed one level up at the bundled `usr/lib/`.
 
+### 5.1 FFmpeg < 7.1 compatibility shim (no engine edit)
+Upstream `plugins/avplug/avencode.c` calls `avcodec_get_supported_config(…,
+AV_CODEC_CONFIG_SAMPLE_FORMAT, …)` **unconditionally** — an API added in
+**libavcodec 61.13.100 (FFmpeg 7.1)**. macOS builds only because Homebrew ships
+ffmpeg 7.x; our reference host, **Ubuntu 24.04, ships libavcodec 60 (FFmpeg 6.1)**,
+so the plugin fails to compile (`AV_CODEC_CONFIG_SAMPLE_FORMAT undeclared`).
+
+To keep the fork thin (the Linux port's promise is **zero** engine/plugin source
+edits), we do **not** patch `avencode.c`. Instead `linux/compat/ffmpeg6-compat.h`
+supplies the enum plus a faithful pre-7.1 implementation (the codec's static
+`sample_fmts` list — exactly what the new call returns for that selector), and
+`build-plugins.sh` force-includes it into the ffmpeg compile via the plugin rule's
+`$(CFLAGS)` hook (`export CFLAGS="… -include …/ffmpeg6-compat.h"`). The header is
+guarded on `LIBAVCODEC_VERSION_INT` and is **inert on FFmpeg ≥ 7.1**, so it is
+safe to leave in place once distros catch up — nothing to retire. `40-plugins.sh`
+(builds + loads the ffmpeg plugin) is the guard; a red line there after an FFmpeg
+bump points back to this shim.
+
+> This is the one place the Linux port needs a compatibility workaround. It lives
+> entirely under `linux/` — no `engine/` or `plugins/` file changes — so the
+> "zero engine source edits" invariant still holds and `ATTRIBUTION.md` needs no
+> new entry (it records engine/Makefile edits; this is neither).
+
 ---
 
 ## 6. AppRun launcher
@@ -168,6 +238,20 @@ because the engine needs a gamedir to reach video bring-up; the data-independent
 confidence comes from the lavapipe loader check and the AppImage run test. If a
 future engine reaches video without game data, promote the software-render init
 tests to run unconditionally.
+
+**Harness reliability (learned the hard way when the suite first ran with data +
+tools present).** Three things the software-render tests depend on:
+- `run_engine_video` routes its env through **`env …`**, not a shell
+  assignment prefix. A `VK_ICD_FILENAMES=…` token produced by `${LVP_ICD:+…}`
+  expansion is *not* honoured as an assignment (the shell tries to exec it), so the
+  inline form silently exec-failed the moment a lavapipe ICD was detected.
+- It **polls for the `renderer initialized` marker** (shared by the GL and VK
+  lines) up to a generous cap instead of a fixed short sleep — a cold llvmpipe /
+  lavapipe pipeline build in a fresh VM can take a few seconds; a warm run returns
+  in ~1s.
+- `FTEQW_DATA` is **exported** (assert.sh), because the packed AppImage's `AppRun`
+  only adds `-basedir` when it sees that variable in its environment — the
+  50-appimage run test drives the engine through `AppRun`, not directly.
 
 ---
 

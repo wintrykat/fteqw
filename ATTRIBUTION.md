@@ -14,6 +14,7 @@ that summary; all files added by this fork are GPL-2.0.
 - Upstream engine: FTEQW — <https://www.fteqw.org/> · <https://github.com/fte-team/fteqw>
 - Forked at upstream revision: `f937b9d` (see the engine's `version` output / `git log`)
 - This fork's macOS/Apple-Silicon work begun: 2026-07-05
+- This fork's Windows-on-ARM (aarch64) work begun: 2026-07-06
 
 ## Modified upstream source files
 
@@ -34,6 +35,11 @@ engine edits at any time with:
 git diff --stat engine/    # engine/vk/vk_init.c | 1 + ; engine/server/sv_main.c | 18 +
 ```
 
+The **Windows-on-ARM** port modifies **no** additional upstream source and **no**
+Makefile lines — it is driven entirely by command-line overrides (documented in
+`docs/PORTING-WINDOWS.md`). The `<limits.h>` line above is platform-agnostic and
+serves Vulkan on both macOS and Windows-on-ARM.
+
 Each engine edit is guarded by a test that goes red if it regresses (house rule:
 *every workaround gets a test*) — `macos/tests` / `linux/tests` for the build fix,
 `tests/behaviour` for the crash fix.
@@ -41,16 +47,18 @@ Each engine edit is guarded by a test that goes red if it regresses (house rule:
 ## Files added by this fork (all GPL-2.0)
 
 - `README.md` — this fork's readme (upstream's preserved as `README.upstream.md`)
-- `docs/PORTING.md`, `docs/BUILDING.md` — macOS change/workaround docs + build guide
-- `docs/PORTING-LINUX.md`, `docs/BUILDING-LINUX.md` — Linux AppImage workaround docs + build guide
-- `macos/scripts/*`, `macos/tests/*` — macOS reproducible build, packaging, and test suite
+- `docs/PORTING.md`, `docs/BUILDING.md` — macOS change/workaround docs and build guide
+- `docs/PORTING-LINUX.md`, `docs/BUILDING-LINUX.md` — Linux AppImage workaround docs and build guide
+- `docs/PORTING-WINDOWS.md`, `docs/HARDWARE-TESTING.md`, `docs/WINDOWS-ARM-PORT.md` — Windows-on-ARM workaround docs, real-device checklist, and implementation brief
+- `macos/scripts/*`, `macos/tests/*` — macOS reproducible build + test suite
 - `linux/scripts/*`, `linux/tests/*` — Linux AppImage build, packaging, and test suite
+- `windows/scripts/*`, `windows/tests/*`, `windows/installer/*` — Windows-on-ARM build, packaging, self-containment audit, tests, and Inno Setup installer
 - `tests/behaviour/*` — platform-neutral runtime **behavioural** test suite (drives the
   engine headless and asserts it loads maps, runs QuakeC, and fails gracefully)
 - `fixtures/ftetest/*` — original, licensing-clean test gamedir (map, QuakeC, generator);
   contains **no** id Software data (see `fixtures/ftetest/LICENSE`)
 - `docs/upstream/*` — bug reports prepared for submission to upstream FTEQW
-- `.github/*` — CI (macOS + Linux) and issue templates
+- `.github/*` — CI (macOS + Linux + Windows-on-ARM) and issue templates
 - `ATTRIBUTION.md`, `CONTRIBUTING.md`, `.gitignore`
 
 The Linux AppImage bundles upstream's own `dist/linux/org.fteqw.fteqw.desktop`,
@@ -76,3 +84,11 @@ FFmpeg (`libav*`) and their dependencies. libpng, jpeg-turbo, libogg and libvorb
 are linked **statically** into the engine. It deliberately does **not** bundle the
 OpenGL/Vulkan/X11/Wayland/libdrm graphics stack — those come from the host GPU
 driver. Their source is available from the respective projects and the distro.
+
+The Windows-on-ARM package bundles the equivalent libraries obtained via **MSYS2
+CLANGARM64** (FreeType, libpng, jpeg-turbo, libogg/libvorbis, Opus, Speex, FFmpeg
+and its codec dependencies, plus the LLVM C++ runtime), each under its own
+GPL-compatible license; source is available from MSYS2 and the upstream projects.
+No Vulkan runtime is bundled on Windows — the Adreno GPU driver provides it.
+Windows system DLLs (`kernel32`, `d3d11`, `dxgi`, `vulkan-1`, …) are not
+redistributed; they belong to the OS.

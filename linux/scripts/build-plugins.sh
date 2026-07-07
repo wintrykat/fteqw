@@ -20,6 +20,15 @@ source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/common.sh"
 if (( $# )); then plugins=("$@"); else plugins=(ffmpeg qi); fi
 np="${plugins[*]}"
 
+# FFmpeg < 7.1 compatibility: upstream avplug uses a libavcodec 61.13 API the
+# distro's FFmpeg 6.x lacks. Force-include a build-time shim (kept under linux/,
+# no engine-tree edit — docs/PORTING-LINUX.md §5) into the ffmpeg plugin compile
+# via the plugin rule's $(CFLAGS) hook. The header is inert on FFmpeg >= 7.1, so
+# injecting it is harmless even for the other plugins built in the same batch.
+if [[ " $np " == *" ffmpeg "* ]]; then
+  export CFLAGS="${CFLAGS:-} -include $LINUX/compat/ffmpeg6-compat.h"
+fi
+
 log "building plugins: $np"
 for p in "${plugins[@]}"; do rm -f "$ENGINE/release/fteplug_$p.so"; done
 make -C "$ENGINE" plugins-rel \

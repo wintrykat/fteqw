@@ -23,6 +23,17 @@ check "freetype dev present"  pkg-config --exists freetype2
 check "Vulkan loader dev present" pkg-config --exists vulkan
 check "ffmpeg (libavformat) dev present" pkg-config --exists libavformat
 
+# FreeType's headers sit in a non-default dir the Makefile does not add itself;
+# build-engine.sh puts it on CPATH (see docs/PORTING-LINUX.md §2.4). Assert the
+# dir pkg-config reports really contains ft2build.h — a red line here means the
+# engine build's `#include <ft2build.h>` will fail. Guards that workaround.
+ft_ok=0
+for d in $(pkg-config --cflags-only-I freetype2 2>/dev/null | tr ' ' '\n' | sed -n 's/^-I//p'); do
+  [[ -f "$d/ft2build.h" ]] && ft_ok=1
+done
+((ft_ok)) && pass "ft2build.h resolvable (freetype2 include dir on the header path)" \
+          || fail "ft2build.h resolvable" "not in any pkg-config freetype2 -I dir"
+
 # Software rasterisers — the Linux edge that lets renderers init with no GPU.
 # Informational: their presence upgrades some Tier-2 checks to run headlessly.
 if ((HAVE_XVFB)); then pass "Xvfb present (headless renderer tests can run)"

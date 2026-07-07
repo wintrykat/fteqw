@@ -50,6 +50,22 @@ link_static vorbis       libvorbis.a
 link_static ogg          libogg.a
 ok "linked distro static libs into libs-$ARCH"
 
+# --- header search the Makefile doesn't add itself ---------------------------
+# The Makefile's LINK_FREETYPE branch (engine/Makefile ~line 1053) BLANKS
+# FREETYPE_CFLAGS and instead expects ft2build.h to live in libs-<arch>/ — a
+# layout produced only by `make makelibs`, which we deliberately skip (see above).
+# The distro ships the FreeType headers in a non-default include dir
+# (…/freetype2) that nothing on the default search path covers, so gl_font.c's
+# `#include <ft2build.h>` fails. Mirror the macOS build's CPATH trick (see
+# macos/scripts/common.sh:setup_build_env): add that dir — derived from
+# pkg-config, never hardcoded — so the include resolves with no Makefile edit.
+# Opus (-I…/opus), Vulkan and SDL2 headers are already added by the Makefile's
+# own pkg-config calls; FreeType is the only gap. See docs/PORTING-LINUX.md §2.4.
+FT_INC="$(pkg-config --cflags-only-I freetype2 2>/dev/null | tr ' ' '\n' | sed -n 's/^-I//p' | paste -sd:)"
+[[ -n "$FT_INC" ]] || die "FreeType headers not found via pkg-config (install libfreetype-dev)"
+export CPATH="$FT_INC${CPATH:+:$CPATH}"
+ok "FreeType headers on CPATH: $FT_INC"
+
 # --- build the merged GL+Vulkan engine ---------------------------------------
 log "building merged GL+Vulkan engine (m-rel)…"
 make -C "$ENGINE" m-rel \

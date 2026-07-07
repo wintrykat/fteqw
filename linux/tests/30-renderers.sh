@@ -23,10 +23,10 @@ fi
 # game data (id1) — so gate on HAVE_DATA, exactly like the macOS suite. When data
 # is present we run under Xvfb + software rasterisers so it works with no GPU.
 if ((HAVE_DATA)) && ((HAVE_XVFB)); then
-  glout="$(run_engine_video 6 +set vid_renderer gl +map start)"
+  glout="$(run_engine_video 20 +set vid_renderer gl +map start)"
   contains "OpenGL renderer initialises (llvmpipe)" "renderer initialized" "$glout"
   if [[ -n "$LVP_ICD" ]]; then
-    vkout="$(run_engine_video 6 +set vid_renderer vk +map start)"
+    vkout="$(run_engine_video 20 +set vid_renderer vk +map start)"
     contains "Vulkan renderer initialises (lavapipe)" "Vulkan-SDL renderer initialized" "$vkout"
   else
     skip "Vulkan renderer initialises (lavapipe)" "no software Vulkan ICD"

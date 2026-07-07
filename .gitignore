@@ -6,7 +6,11 @@ engine/debug/
 engine/release/
 engine/libs-*/
 engine/bullet3-*/
+engine/fte_libav_*/
 engine/*.tar.gz
+
+# Windows-on-ARM build output (self-contained package + portable ZIP + installer)
+windows/dist/
 engine/shaders/generatebuiltinsl
 engine/shaders/makevulkanblob
 engine/shaders/vulkanblobs/

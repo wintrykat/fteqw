@@ -1,0 +1,5 @@
+# Shell scripts must stay LF in the working tree on every platform — MSYS2 /
+# Unix bash (and zsh) break on CRLF line endings ("\r command not found"). Without
+# this, a Windows checkout with core.autocrlf=true would corrupt the build/test
+# scripts. Covers both macos/ and windows/ tooling.
+*.sh text eol=lf

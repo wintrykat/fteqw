@@ -58,6 +58,21 @@ LINUXDEPLOY="$(ensure_tool linuxdeploy "$LINUXDEPLOY_URL")"
   -d "$APPDIR/usr/share/applications/$APPID.desktop" \
   -i "$ICON" >/dev/null
 
+# --- bundle the libs linuxdeploy's excludelist skipped -----------------------
+# linuxdeploy honours the broad *AppImage excludelist* (glibc-adjacent + a set of
+# "assumed present" libs: libz, libfreetype, libasound, libexpat, libgpg-error …).
+# That is a SUPERSET of our ALLOWLIST, which permits only the GPU/display driver +
+# glibc ABI to come from the host (docs/PORTING-LINUX.md §3/§4). The gap: those
+# excluded-but-not-driver libs are left resolving to the host, and because the
+# engine directly needs libz/libfreetype, the host libfreetype then drags host
+# copies of the libs we DID bundle (libpng16, libbz2, libbrotli*) back in too.
+# Pull the remainder into usr/lib ourselves — the same mechanism build-plugins.sh
+# uses for the ffmpeg closure — so the whole chain resolves inside the AppDir.
+# The renderer-init test (30-renderers.sh, lavapipe) guards against a bundled
+# low-level lib shadowing the host GL/Vulkan driver.
+log "bundling deps linuxdeploy excluded (libz/freetype/asound/… — PORTING-LINUX.md §4)"
+bundle_so_deps "$APPDIR/usr/bin/fteqw-engine" "$APPDIR/usr/lib"
+
 # --- self-containment audit --------------------------------------------------
 if bad="$(audit_selfcontained "$APPDIR/usr/bin/fteqw-engine" "$APPDIR/usr/lib/"*.so* 2>/dev/null)"; then
   ok "self-contained: 0 non-allowlisted external refs across $(ls "$APPDIR/usr/lib" 2>/dev/null | wc -l | tr -d ' ') bundled libs"

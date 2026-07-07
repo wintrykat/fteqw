@@ -71,13 +71,16 @@ ALLOWLIST=(
   libgcc_s libstdc++
   # OpenGL / EGL / GLX (provided by the GPU driver)
   libGL libGLX libGLdispatch libOpenGL libEGL libGLU
+  libexpat            # Mesa's libGLX_mesa parses drirc via libexpat (host GL stack)
   # Vulkan loader (the ICD/driver is the user's; mirrors "driver provides Vulkan")
   libvulkan
   # X11 / XCB
   libX11 libxcb libXext libXi libXrandr libXrender libXfixes libXcursor
   libXinerama libXss libXxf86vm libXau libXdmcp libXdamage libXt libSM libICE
+  libbsd libmd         # pulled by host libX11/libXdmcp + libGL (X11/display stack)
   # Wayland / input / KMS
   libwayland libxkbcommon libdecor libdrm libgbm libudev
+  libffi               # host libwayland-client/server link libffi (Wayland stack)
 )
 
 # --- helpers -----------------------------------------------------------------
